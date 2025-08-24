@@ -6,12 +6,13 @@ authors = [
     {name = "BaerVervergaert",email = "bgmj.ververgaert@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "pytest (>=8.4.1,<9.0.0)",
     "numpy (>=2.3.2,<3.0.0)",
     "matplotlib (>=3.10.5,<4.0.0)",
-    "scikit-learn (>=1.7.1,<2.0.0)"
+    "scikit-learn (>=1.7.1,<2.0.0)",
+    "ngboost (>=0.5.6,<0.6.0)"
 ]
 
 
