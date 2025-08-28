@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, Callable, Union
+from typing import Any, Callable, Union, Literal
 from honeytribe.online_convex_optimization.base import OnlineAlgorithm
 
 import numpy as np
@@ -974,3 +974,76 @@ class OnlineFKMAlgorithm(BaseGradientDescentAlgorithm):
         """Reset algorithm to initial state."""
         super().reset()
         self._perturb = True
+
+class BaseParameterReprocessingMixin(ABC):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._reprocessed_params = None
+        self._stored_algorithm_params = None
+        self._live_params: Literal["unprocessed", "reprocessed"] = "unprocessed"
+    def update(self, state: Any, prediction: Any, loss: Union[float, np.ndarray], y_true: Any = None):
+        super().update(state, prediction, loss, y_true)
+    @property
+    def is_reprocessed(self):
+        return self._live_params == "reprocessed"
+    def set_params_to_algorithm_params(self):
+        if self.is_reprocessed:
+            if self._stored_algorithm_params is not None:
+                stored = self._stored_algorithm_params.copy()
+                self.parameters = stored
+            self._live_params = "unprocessed"
+    def set_params_to_reprocessed_params(self):
+        if not self.is_reprocessed:
+            if self._reprocessed_params is None:
+                raise ValueError('Parameters not yet reprocessed. Cannot set to algorithm parameters.')
+            reprocessed = self._reprocessed_params.copy()
+            to_store = self.parameters.copy()
+            self.parameters = reprocessed
+            self._stored_algorithm_params = to_store
+            self._live_params = "reprocessed"
+    def partial_fit(self, X, y):
+        self.set_params_to_algorithm_params()
+        super().partial_fit(X, y)
+        self.set_params_to_reprocessed_params()
+    def reset(self):
+        super().reset()
+        self._reprocessed_params = None
+        self._stored_algorithm_params = None
+        self._live_params = "unprocessed"
+
+class MeanParameterReprocessorMixin(BaseParameterReprocessingMixin):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._reprocessed_params = np.zeros_like(self.parameters)
+    def update(self, state: Any, prediction: Any, loss: Union[float, np.ndarray], y_true: Any = None):
+        super().update(state, prediction, loss, y_true)
+        self._reprocessed_params = (self.t - 1)/self.t * self._reprocessed_params + 1/self.t * self.parameters
+    def reset(self):
+        super().reset()
+        self._reprocessed_params = np.zeros_like(self.parameters)
+
+class ExponentialMeanParameterReprocessorMixin(BaseParameterReprocessingMixin):
+    def __init__(self, *args, reprocessor_beta = .9, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._reprocessed_params = np.zeros_like(self.parameters)
+        self._reprocessor_beta = reprocessor_beta
+    def update(self, state: Any, prediction: Any, loss: Union[float, np.ndarray], y_true: Any = None):
+        super().update(state, prediction, loss, y_true)
+        self._reprocessed_params = self._reprocessor_beta * self._reprocessed_params + (1 - self._reprocessor_beta) * self.parameters.copy()
+    def reset(self):
+        super().reset()
+        self._reprocessed_params = np.zeros_like(self.parameters)
+
+class RootMeanParameterReprocessorMixin(BaseParameterReprocessingMixin):
+    def __init__(self, *args, reprocessor_root: float = 0.5, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._reprocessed_params = np.zeros_like(self.parameters)
+        self._reprocessor_root = reprocessor_root
+    def update(self, state: Any, prediction: Any, loss: Union[float, np.ndarray], y_true: Any = None):
+        super().update(state, prediction, loss, y_true)
+        N = np.power(self.t, self._reprocessor_root)
+        beta = (N - 1) / N
+        self._reprocessed_params = beta * self._reprocessed_params + (1 - beta) * self.parameters.copy()
+    def reset(self):
+        super().reset()
+        self._reprocessed_params = np.zeros_like(self.parameters)

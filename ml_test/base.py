@@ -106,12 +106,21 @@ class ConvergenceChecker:
         plt.show()
 
     @staticmethod
-    def plot_predicts(prediction_history: List[float], target_history: List[float], test_name: str, save_path: str = None):
+    def plot_predicts(prediction_future: List[float], target_future: List[float], prediction_history: List[float] = None, target_history: List[float] = None, test_name: str = None, save_path: str = None):
         """Plot predictions over time."""
+        if test_name is None:
+            raise ValueError('Variable `test_name` must be given.')
         plt.figure(figsize=(10, 6))
-        plt.plot(prediction_history, '.', label='Predictions', color='blue')
-        plt.plot(target_history, '.', label='Target', color='orange')
-        plt.title(f'Prediction History - {test_name}')
+        N = len(prediction_history) if prediction_history is not None else 0
+        plt.plot(N + np.arange(len(prediction_future)), prediction_future, '.', label='Predictions (future)', color='dodgerblue')
+        plt.plot(N + np.arange(len(target_future)), target_future, '.', label='Target (future)', color='gold')
+        if prediction_history is not None:
+            plt.plot(prediction_history, '.', label='Predictions (history)', color='blue')
+        if target_history is not None:
+            plt.plot(target_history, '.', label='Target (history)', color='orange')
+        if N != 0:
+            plt.axvline(N, color='black', label='future')
+        plt.title(f'Predictions - {test_name}')
         plt.xlabel('Iteration')
         plt.ylabel('Prediction')
         plt.legend()
@@ -174,8 +183,11 @@ class AlgorithmTester:
             else:
                 # Otherwise, just predict on the test set
                 print("Using predict method for predictions.")
-                prediction_history = algorithm.predict(X_test).tolist()
-                target_history = y_test.tolist()  # Assuming y_test is the target
+                prediction_history = algorithm.predict(X_train).tolist()
+                target_history = y_train.tolist()  # Assuming y_train is the target
+
+            prediction_future = algorithm.predict(X_test)
+            target_future = y_test.tolist()
 
             # Calculate performance metrics
             performance_metrics = algorithm.get_performance_metrics(X_test, y_test)
@@ -198,7 +210,7 @@ class AlgorithmTester:
 
             # Save prediction plot if applicable
             plot_path = self.results_dir / f"{test_case.name}_predictions.png"
-            ConvergenceChecker.plot_predicts(prediction_history, target_history, test_case.name, str(plot_path))
+            ConvergenceChecker.plot_predicts(prediction_future, target_future, prediction_history, target_history, test_case.name, str(plot_path))
 
             return TestResult(
                 test_name=test_case.name,

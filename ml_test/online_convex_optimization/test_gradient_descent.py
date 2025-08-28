@@ -1,4 +1,4 @@
-from honeytribe.online_convex_optimization.gradient_descent import GradientDescentAlgorithm, DifferentiableFunction, DifferentiableIdentityFunction, DifferentiableSquaredLossFunction, StochasticDifferentiableFunction, BetaHolderReductionFunction, DifferentiableAbsoluteLossFunction, OnlineNewtonStepAlgorithm, DifferentiableSumFunction, OnlineMirrorDescentAlgorithm, ExponentialGradientAlgorithm, DifferentiableSquaredFunction, OnlineADAMAlgorithm, OnlineFKMAlgorithm
+from honeytribe.online_convex_optimization.gradient_descent import GradientDescentAlgorithm, DifferentiableFunction, DifferentiableIdentityFunction, DifferentiableSquaredLossFunction, StochasticDifferentiableFunction, BetaHolderReductionFunction, DifferentiableAbsoluteLossFunction, OnlineNewtonStepAlgorithm, DifferentiableSumFunction, OnlineMirrorDescentAlgorithm, ExponentialGradientAlgorithm, DifferentiableSquaredFunction, OnlineADAMAlgorithm, OnlineFKMAlgorithm, MeanParameterReprocessorMixin, ExponentialMeanParameterReprocessorMixin, RootMeanParameterReprocessorMixin
 from honeytribe.online_convex_optimization.experimental.gradient_descent import OnlineForgetfulNewtonStepAlgorithm
 from ml_test.base import Algorithm, TestCase, DataGenerators, AlgorithmTester
 
@@ -383,13 +383,10 @@ if __name__ == "__main__" and False:
     print("\n✅ All tests completed! Check the 'dt_test_results' directory for detailed results and plots.")
 
 
-if __name__ == "__main__" and True:
+if __name__ == "__main__" and False:
     print("Testing Online Gradient Descent Algorithms with AI Algorithm Testing Framework")
     print("=" * 60)
 
-    # NOTE: With most hyperparameters FKM has terrible performance. There must be a better way to do this.
-
-    # Test Classification
     print("\nTesting Exponential Gradient Algorithm...") # NOT TESTED!!! NEEDS CUSTOM TEST CASES
 
     def model_factory():
@@ -416,4 +413,170 @@ if __name__ == "__main__" and True:
     results = tester.run_test_suite(model_factory, tests)
 
     print("\n✅ All tests completed! Check the 'dt_test_results' directory for detailed results and plots.")
+
+
+if __name__ == "__main__" and False:
+    print("Testing Online Gradient Descent Algorithms with AI Algorithm Testing Framework")
+    print("=" * 60)
+
+    print("\nTesting Gradient Descent Algorithm...")
+
+    def model_factory():
+        """Factory function to create a new instance of the model."""
+        objective_function = DifferentiableIdentityFunction()
+        loss_function = DifferentiableSquaredLossFunction()
+        class Model(MeanParameterReprocessorMixin, GradientDescentAlgorithm):
+            pass
+        model = Model(
+            parameters = 1,
+            objective_function = objective_function,
+            learning_rate = .5,
+            loss_function = loss_function,
+        )
+        wrapped_model = WrapperAlgorithm(model)
+        return wrapped_model
+
+    tester = AlgorithmTester(results_dir="dt_test_results")
+
+    # Create classification test cases (exclude regression)
+    tests = [tc for tc in create_decision_tree_test_cases()]
+
+    results = tester.run_test_suite(model_factory, tests)
+
+    print("\n✅ All tests completed! Check the 'dt_test_results' directory for detailed results and plots.")
+
+
+if __name__ == "__main__" and False:
+    print("Testing Online Gradient Descent Algorithms with AI Algorithm Testing Framework")
+    print("=" * 60)
+
+    print("\nTesting Gradient Descent Algorithm...")
+
+    def model_factory():
+        """Factory function to create a new instance of the model."""
+        objective_function = DifferentiableIdentityFunction()
+        loss_function = DifferentiableSquaredLossFunction()
+        class Model(ExponentialMeanParameterReprocessorMixin, GradientDescentAlgorithm):
+            pass
+        model = Model(
+            parameters = 1,
+            objective_function = objective_function,
+            learning_rate = .5,
+            loss_function = loss_function,
+            reprocessor_beta=.9,
+        )
+        wrapped_model = WrapperAlgorithm(model)
+        return wrapped_model
+
+    tester = AlgorithmTester(results_dir="dt_test_results")
+
+    # Create classification test cases (exclude regression)
+    tests = [tc for tc in create_decision_tree_test_cases()]
+
+    results = tester.run_test_suite(model_factory, tests)
+
+    print("\n✅ All tests completed! Check the 'dt_test_results' directory for detailed results and plots.")
+
+
+if __name__ == "__main__" and False:
+    print("Testing Online Gradient Descent Algorithms with AI Algorithm Testing Framework")
+    print("=" * 60)
+
+    print("\nTesting Gradient Descent Algorithm...")
+
+    def model_factory():
+        """Factory function to create a new instance of the model."""
+        objective_function = DifferentiableIdentityFunction()
+        loss_function = DifferentiableSquaredLossFunction()
+        class Model(RootMeanParameterReprocessorMixin, GradientDescentAlgorithm):
+            pass
+        model = Model(
+            parameters = 1,
+            objective_function = objective_function,
+            learning_rate = .5,
+            loss_function = loss_function,
+            reprocessor_root=.75,
+        )
+        wrapped_model = WrapperAlgorithm(model)
+        return wrapped_model
+
+    tester = AlgorithmTester(results_dir="dt_test_results")
+
+    # Create classification test cases (exclude regression)
+    tests = [tc for tc in create_decision_tree_test_cases()]
+
+    results = tester.run_test_suite(model_factory, tests)
+
+    print("\n✅ All tests completed! Check the 'dt_test_results' directory for detailed results and plots.")
+
+if __name__ == "__main__" and False:
+    print("Testing Online Gradient Descent Algorithms with AI Algorithm Testing Framework")
+    print("=" * 60)
+
+    print("\nTesting FKM Gradient Descent Algorithm with Mean parameter reprocessing...")
+
+    def model_factory():
+        """Factory function to create a new instance of the model."""
+        learning_rate = lambda t, gamma=.1: gamma / np.sqrt(t) if t > 0 else gamma
+        delta = lambda t, gamma=.01, scale=2.: scale * np.sqrt(learning_rate(t, gamma))
+        objective_function = DifferentiableSumFunction()
+        loss_function = DifferentiableSquaredLossFunction()
+        class Model(MeanParameterReprocessorMixin, OnlineFKMAlgorithm):
+            pass
+        model = Model(
+            parameters = 2,
+            objective_function = objective_function,
+            learning_rate = learning_rate,
+            delta= delta,
+            loss_function = loss_function,
+            seed=0
+        )
+        wrapped_model = WrapperAlgorithm(model)
+        return wrapped_model
+
+    tester = AlgorithmTester(results_dir="dt_test_results")
+
+    # Create classification test cases (exclude regression)
+    tests = [tc for tc in create_decision_tree_test_cases()]
+
+    results = tester.run_test_suite(model_factory, tests)
+
+    print("\n✅ All tests completed! Check the 'dt_test_results' directory for detailed results and plots.")
+
+
+if __name__ == "__main__" and True:
+    print("Testing Online Gradient Descent Algorithms with AI Algorithm Testing Framework")
+    print("=" * 60)
+
+    print("\nTesting FKM Gradient Descent Algorithm with Mean parameter reprocessing...")
+
+    def model_factory():
+        """Factory function to create a new instance of the model."""
+        learning_rate = lambda t, gamma=.1: gamma / np.sqrt(t) if t > 0 else gamma
+        delta = lambda t, gamma=.01, scale=2.: scale * np.sqrt(learning_rate(t, gamma))
+        objective_function = DifferentiableSumFunction()
+        loss_function = DifferentiableSquaredLossFunction()
+        class Model(ExponentialMeanParameterReprocessorMixin, OnlineFKMAlgorithm):
+            pass
+        model = Model(
+            parameters = 2,
+            objective_function = objective_function,
+            learning_rate = learning_rate,
+            delta= delta,
+            loss_function = loss_function,
+            seed=0,
+            reprocessor_beta=.95
+        )
+        wrapped_model = WrapperAlgorithm(model)
+        return wrapped_model
+
+    tester = AlgorithmTester(results_dir="dt_test_results")
+
+    # Create classification test cases (exclude regression)
+    tests = [tc for tc in create_decision_tree_test_cases()]
+
+    results = tester.run_test_suite(model_factory, tests)
+
+    print("\n✅ All tests completed! Check the 'dt_test_results' directory for detailed results and plots.")
+
 
