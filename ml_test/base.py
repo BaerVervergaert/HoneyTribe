@@ -175,10 +175,10 @@ class AlgorithmTester:
             )
 
             # Get predictions and target history
-            if hasattr(algorithm, 'predict_history'):
+            if hasattr(algorithm, 'get_predict_history'):
                 # If the algorithm has a predict_history method, use it
                 print("Using predict_history for predictions.")
-                prediction_history = algorithm.predict_history
+                prediction_history = algorithm.get_predict_history()
                 target_history = y_train.tolist()  # Assuming y_train is the target
             else:
                 # Otherwise, just predict on the test set

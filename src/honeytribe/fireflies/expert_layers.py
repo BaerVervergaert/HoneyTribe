@@ -3,12 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class ExpertSignLinear(nn.Module):
-    def __init__(self, input_dim: int, output_dim: int, include_zero: bool = True, bias: bool = True, learning_rate: float = 0.1):
+    def __init__(self, input_dim: int, output_dim: int, include_zero: bool = True, bias: bool = True, learning_rate: float = 0.1, alpha=.1):
         super().__init__()
+        self.alpha = alpha
         self.include_zero = include_zero
-        self.expert_prob = torch.ones((2 if not include_zero else 3, input_dim, output_dim))
+        self.expert_prob = torch.ones((2 if not include_zero else 3, output_dim, input_dim))
         self.expert_prob = self.expert_prob / self.expert_prob.sum(dim=0, keepdim=True)
-        self.matrix = nn.Parameter(torch.randn((2, input_dim, output_dim)))
+        self.matrix = nn.Parameter(torch.randn((2, output_dim, input_dim)))
         self.bias = nn.Parameter(torch.randn((output_dim,))) if bias else 0.
         self.transform = lambda x: torch.abs(x)
         self._last_choice = None
@@ -42,5 +43,8 @@ class ExpertSignLinear(nn.Module):
                     p = self.expert_prob[choice, i, j]
                     estimated_loss = loss / p
                     self.expert_prob[choice, i, j] *= torch.exp(-self.learning_rate * estimated_loss)
+            K = (3 if self.include_zero else 2)
+            beta = self.alpha * K / (K - 1)
+            self.expert_prob = (1 - beta) * self.expert_prob + beta / K
             self.expert_prob = self.expert_prob / self.expert_prob.sum(dim=0, keepdim=True)
         self._last_choice = None
