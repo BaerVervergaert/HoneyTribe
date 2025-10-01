@@ -1,20 +1,59 @@
+from dataclasses import dataclass
+from string import Template
+from numbers import Number
+
 import scipy.stats as st
 import numpy as np
 
+@dataclass
+class CorrelationOutput:
+    name: str
+    value: float
+    p_value: float|None = None
+    hypothesis_test: str|None = None
+    hypothesis_test_description: str|None = None
+    hypothesis_test_notes: str|None = None
+
+@dataclass
+class CorrelationMatrixOutput:
+    name: str
+    value: list[list[float]]
+    p_value: list[list[float]]
+    hypothesis_test: str|None = None
+    hypothesis_test_description: str|None = None
+    hypothesis_test_notes: str|None = None
+    column_index: list[str]|None = None
+    row_index: list[str]|None = None
+
 def kendalltau(a, b):
-    return st.kendalltau(a, b)[0]
+    tau, p_value = st.kendalltau(a, b)
+    return CorrelationOutput(
+        name = "Kendall-Tau",
+        value = tau,
+        p_value = p_value,
+        hypothesis_test = "H_0: tau = 0",
+        hypothesis_test_description = """Test if there is a monotonic relation between the variables."""
+    )
 
 def pearsonr(a, b):
-    return st.pearsonr(a, b)[0]
+    r, p_value = st.pearsonr(a, b)
+    return CorrelationOutput(
+        name = "Pearson-r",
+        value = r,
+        p_value = p_value,
+        hypothesis_test = "H_0: r = 0",
+        hypothesis_test_description = """Test if there is a linear trend between the variables."""
+    )
 
 def spearmanr(a, b):
-    return st.spearmanr(a, b)[0]
-
-def chatterjeexi(a, b):
-    return st.chatterjeexi(a, b)[0]
-
-def somersd(contingency_table):
-    return st.somersd(contingency_table)
+    r, p_value = st.spearmanr(a, b)
+    return CorrelationOutput(
+        name = "Spearman-r",
+        value = r,
+        p_value = p_value,
+        hypothesis_test = "H_0: r = 0",
+        hypothesis_test_description = """Test if there is a monotonic relation between the variables."""
+    )
 
 def chatterjeexi(a, b):
     """Chatterjee's xi correlation coefficient.
@@ -26,14 +65,37 @@ def chatterjeexi(a, b):
     2. It is 0 if and only if the variables are independent.
     3. It is 1 if and only if there is a measurable function f such that Y = f(X) almost surely.
     """
-    return st.chatterjeexi(a, b)[0]
+    xi, p_value = st.chatterjeexi(a, b)
+    return CorrelationOutput(
+        name = "Chatterjee-xi",
+        value = xi,
+        p_value = p_value,
+        hypothesis_test = "H_0: xi = 0",
+        hypothesis_test_description = """Test if the variables are not indepedent. Low p-value implies no independence, and high p-value implies not enough evidence to refute independence (likely independent or not enough data)."""
+    )
+
+def somersd(contingency_table):
+    d, p_value = st.somersd(contingency_table)
+    return CorrelationOutput(
+        name = "Somers-d",
+        value = d,
+        p_value = p_value,
+        hypothesis_test = "H_0: d = 0",
+        hypothesis_test_description = """Test if the variables are ordinally associated."""
+    )
 
 def stepanovr(a, b):
     """Stepanov's r correlation coefficient.
 
     Based on Kendall's tau and Spearman's rho. See: https://arxiv.org/pdf/2405.16469
+
+    Stepanov has introduced an improved version, which is not yet implemented. See: https://arxiv.org/pdf/2506.06056
     """
-    return (3 * kendalltau(a, b) - spearmanr(a, b)) / 2
+    r = (3 * kendalltau(a, b).value - spearmanr(a, b).value) / 2
+    return CorrelationOutput(
+        name = "Stepanov-r",
+        value = r,
+    )
 
 def relative_model_improvement_coefficient(a, b, baseline):
     """Generalization of Pearson's r to measure relative model improvement.
@@ -87,10 +149,37 @@ def correlation_matrix(A, B=None, metric=pearsonr):
     n2, m2 = B.shape
     assert n1 == n2
     C = np.zeros((m1, m2))
+    P = np.zeros((m1, m2))
+    P[:, :] = np.nan
+    name = None
+    hypothesis_test = None
+    hypothesis_test_description = None
+    hypothesis_test_notes = None
     for i in range(m1):
         for j in range(m2):
             if symmetric and j < i:
                 C[i, j] = C[j, i]
+                P[i, j] = P[j, i]
             else:
-                C[i, j] = metric(A[:, i], B[:, j])
-    return C
+                corr_value = metric(A[:, i], B[:, j])
+                if isinstance(corr_value, CorrelationOutput):
+                    C[i, j] = corr_value.value
+                    P[i, j] = corr_value.p_value
+                    name = corr_value.name
+                    hypothesis_test = corr_value.hypothesis_test
+                    hypothesis_test_description = corr_value.hypothesis_test_description
+                    hypothesis_test_notes = corr_value.hypothesis_test_notes
+                elif isinstance(corr_value, Number):
+                    C[i, j] = corr_value
+                else:
+                    raise ValueError(f'Cannot handle return value {corr_value} of type {type(corr_value)}.')
+    return CorrelationMatrixOutput(
+        name = name,
+        value = C,
+        p_value = P,
+        hypothesis_test = hypothesis_test,
+        hypothesis_test_description = hypothesis_test_description,
+        hypothesis_test_notes = hypothesis_test_notes,
+        column_index = getattr(A, 'columns', None),
+        row_index = getattr(B, 'columns', None),
+    )
