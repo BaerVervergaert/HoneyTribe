@@ -8,14 +8,18 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "pytest (>=8.4.1,<9.0.0)",
     "numpy (>=2.3.2,<3.0.0)",
-    "matplotlib (>=3.10.5,<4.0.0)",
     "scikit-learn (>=1.7.1,<2.0.0)",
     "ngboost (>=0.5.6,<0.6.0)",
-    "torch (>=2.8.0,<3.0.0)"
+    "pandas (>=2.3.3,<3.0.0)",
 ]
 
+
+[project.optional-dependencies]
+torch = ["torch (>=2.8.0,<3.0.0)"]
+visual = ["matplotlib (>=3.10.6,<4.0.0)"]
+full = ["torch (>=2.8.0,<3.0.0)", "matplotlib (>=3.10.6,<4.0.0)"]
+test = ["pytest (>=8.4.2,<9.0.0)"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
