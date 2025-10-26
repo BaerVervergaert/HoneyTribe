@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from string import Template
 from numbers import Number
 
+import pandas as pd
 import scipy.stats as st
 import numpy as np
 
@@ -139,7 +140,7 @@ def error_correlation_for_model_improvement(a, b, baseline, metric=pearsonr):
     b_err = b - baseline
     return metric(a_err, b_err)
 
-def correlation_matrix(A, B=None, metric=pearsonr):
+def correlation_matrix(A: np.ndarray|pd.DataFrame, B=None, metric=pearsonr) -> CorrelationMatrixOutput:
     if B is None:
         B = A
         symmetric = True
@@ -147,7 +148,7 @@ def correlation_matrix(A, B=None, metric=pearsonr):
         symmetric = False
     n1, m1 = A.shape
     n2, m2 = B.shape
-    assert n1 == n2
+    assert n1 == n2, 'Input arrays must have the same number of rows.'
     C = np.zeros((m1, m2))
     P = np.zeros((m1, m2))
     P[:, :] = np.nan

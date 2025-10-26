@@ -1,6 +1,13 @@
 import numpy as np
 import pandas as pd
 
+def _name_function(name: str):
+    def decorator(func):
+        func.__name__ = name
+        return func
+    return decorator
+
+@_name_function('mean')
 def mean(a, sample_weight=None):
     val = a.copy()
     if sample_weight is not None:
@@ -9,10 +16,28 @@ def mean(a, sample_weight=None):
         val = val * sample_weight / norm
     return np.mean(val)
 
+@_name_function('median')
 def median(a, sample_weight=None):
     q = 0.5
     return quantile(a, q, sample_weight)
 
+@_name_function('lower_quartile')
+def lower_quartile(a, sample_weight=None):
+    q = 0.25
+    return quantile(a, q, sample_weight)
+
+@_name_function('upper_quartile')
+def upper_quartile(a, sample_weight=None):
+    q = 0.75
+    return quantile(a, q, sample_weight)
+
+@_name_function('min')
+def min(a, sample_weight=None):
+    return np.min(a)
+
+@_name_function('max')
+def max(a, sample_weight=None):
+    return np.max(a)
 
 def quantile(a, q: float, sample_weight = None):
     idx = np.argsort(a)
@@ -46,6 +71,7 @@ def quantile(a, q: float, sample_weight = None):
     else:
         return val[i]
 
+@_name_function('mode')
 def mode(a, sample_weight=None):
     df = pd.DataFrame(data = {'val':a})
     if sample_weight is not None:
@@ -54,11 +80,13 @@ def mode(a, sample_weight=None):
         df['sample_weight'] = 1 / len(df)
     return df.groupby('val').sample_weight.sum().idxmax()
 
+@_name_function('std')
 def mirror_centrality(a, mirror_transform, inverse_transform, centrality_measure, bias_correction=None, **kwargs):
     if bias_correction is None:
         bias_correction = lambda a: 1.
     return inverse_transform(bias_correction(a) * centrality_measure(mirror_transform(a), **kwargs))
 
+@_name_function('geometric_mean')
 def geometric_mean(a, sample_weight=None):
     return mirror_centrality(
         a,
