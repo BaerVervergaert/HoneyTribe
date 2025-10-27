@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-from string import Template
 from numbers import Number
 
 import pandas as pd
 import scipy.stats as st
 import numpy as np
+
+from honeytribe.metrics.utils import _name_function
 
 @dataclass
 class CorrelationOutput:
@@ -25,7 +26,16 @@ class CorrelationMatrixOutput:
     hypothesis_test_notes: str|None = None
     column_index: list[str]|None = None
     row_index: list[str]|None = None
+    symmetric: bool = False
 
+def _symmetric(symmetric: bool = True):
+    def func(f):
+        f._symmetric = symmetric
+        return f
+    return func
+
+@_name_function('kendalltau')
+@_symmetric()
 def kendalltau(a, b):
     tau, p_value = st.kendalltau(a, b)
     return CorrelationOutput(
@@ -36,6 +46,8 @@ def kendalltau(a, b):
         hypothesis_test_description = """Test if there is a monotonic relation between the variables."""
     )
 
+@_name_function('pearsonr')
+@_symmetric()
 def pearsonr(a, b):
     r, p_value = st.pearsonr(a, b)
     return CorrelationOutput(
@@ -46,6 +58,8 @@ def pearsonr(a, b):
         hypothesis_test_description = """Test if there is a linear trend between the variables."""
     )
 
+@_name_function('spearmanr')
+@_symmetric()
 def spearmanr(a, b):
     r, p_value = st.spearmanr(a, b)
     return CorrelationOutput(
@@ -56,6 +70,8 @@ def spearmanr(a, b):
         hypothesis_test_description = """Test if there is a monotonic relation between the variables."""
     )
 
+@_name_function('chatterjeexi')
+@_symmetric(False)
 def chatterjeexi(a, b):
     """Chatterjee's xi correlation coefficient.
 
@@ -75,6 +91,7 @@ def chatterjeexi(a, b):
         hypothesis_test_description = """Test if the variables are not indepedent. Low p-value implies no independence, and high p-value implies not enough evidence to refute independence (likely independent or not enough data)."""
     )
 
+@_name_function('somersd')
 def somersd(contingency_table):
     d, p_value = st.somersd(contingency_table)
     return CorrelationOutput(
@@ -85,6 +102,8 @@ def somersd(contingency_table):
         hypothesis_test_description = """Test if the variables are ordinally associated."""
     )
 
+@_name_function('stepanovr')
+@_symmetric()
 def stepanovr(a, b):
     """Stepanov's r correlation coefficient.
 
@@ -140,12 +159,18 @@ def error_correlation_for_model_improvement(a, b, baseline, metric=pearsonr):
     b_err = b - baseline
     return metric(a_err, b_err)
 
-def correlation_matrix(A: np.ndarray|pd.DataFrame, B=None, metric=pearsonr) -> CorrelationMatrixOutput:
+def correlation_matrix(A: np.ndarray|pd.DataFrame, B: np.ndarray|pd.DataFrame|None = None, metric=pearsonr) -> CorrelationMatrixOutput:
     if B is None:
         B = A
-        symmetric = True
+        symmetric = getattr(metric, '_symmetric', False)
     else:
         symmetric = False
+    column_index = getattr(A, 'columns', None)
+    row_index = getattr(B, 'columns', None)
+    if isinstance(A, pd.DataFrame):
+        A = A.to_numpy()
+    if isinstance(B, pd.DataFrame):
+        B = B.to_numpy()
     n1, m1 = A.shape
     n2, m2 = B.shape
     assert n1 == n2, 'Input arrays must have the same number of rows.'
@@ -181,6 +206,7 @@ def correlation_matrix(A: np.ndarray|pd.DataFrame, B=None, metric=pearsonr) -> C
         hypothesis_test = hypothesis_test,
         hypothesis_test_description = hypothesis_test_description,
         hypothesis_test_notes = hypothesis_test_notes,
-        column_index = getattr(A, 'columns', None),
-        row_index = getattr(B, 'columns', None),
+        column_index = column_index,
+        row_index = row_index,
+        symmetric = symmetric,
     )

@@ -16,10 +16,23 @@ dependencies = [
 
 
 [project.optional-dependencies]
-torch = ["torch (>=2.8.0,<3.0.0)"]
-visual = ["matplotlib (>=3.10.6,<4.0.0)", "weasyprint (>=66.0,<67.0)"]
-full = ["torch (>=2.8.0,<3.0.0)", "matplotlib (>=3.10.6,<4.0.0)"]
-test = ["pytest (>=8.4.2,<9.0.0)"]
+torch = [
+    "torch (>=2.8.0,<3.0.0)"
+]
+visual = [
+    "matplotlib (>=3.10.6,<4.0.0)",
+    "weasyprint (>=66.0,<67.0)",
+    "notebook (>=7.4.7,<8.0.0)"
+]
+full = [
+    "torch (>=2.8.0,<3.0.0)",
+    "matplotlib (>=3.10.6,<4.0.0)",
+    "weasyprint (>=66.0,<67.0)",
+    "notebook (>=7.4.7,<8.0.0)"
+]
+test = [
+    "pytest (>=8.4.2,<9.0.0)"
+]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -31,6 +44,3 @@ packages = [
     {include = "ml_test", from = "."},
     {include = "honeytribe", from = "src"},
 ]
-[tool.poetry.group.visual.dependencies]
-weasyprint = "^66.0"
-

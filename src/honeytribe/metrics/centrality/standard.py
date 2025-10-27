@@ -1,11 +1,9 @@
 import numpy as np
 import pandas as pd
+from math import ceil
 
-def _name_function(name: str):
-    def decorator(func):
-        func.__name__ = name
-        return func
-    return decorator
+from honeytribe.metrics.utils import _name_function
+
 
 @_name_function('mean')
 def mean(a, sample_weight=None):
@@ -57,13 +55,14 @@ def quantile(a, q: float, sample_weight = None):
             q_0 = 0
     else:
         N = len(a)
-        i = N // 2
-        if i % 2 == 1:
+        M = N - 1
+        i = int(ceil(q * M))
+        if i > 0:
+            q_1 = i - (q * M)
+            q_0 = 1 - q_1
+        else:
             q_1 = 1
             q_0 = 0
-        else:
-            q_1 = .5
-            q_0 = .5
     if q_0 > 0:
         val_1 = val[i]
         val_0 = val[i - 1]
@@ -80,7 +79,6 @@ def mode(a, sample_weight=None):
         df['sample_weight'] = 1 / len(df)
     return df.groupby('val').sample_weight.sum().idxmax()
 
-@_name_function('std')
 def mirror_centrality(a, mirror_transform, inverse_transform, centrality_measure, bias_correction=None, **kwargs):
     if bias_correction is None:
         bias_correction = lambda a: 1.
