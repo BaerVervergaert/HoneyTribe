@@ -28,6 +28,27 @@ class CorrelationMatrixOutput:
     row_index: list[str]|None = None
     symmetric: bool = False
 
+@dataclass
+class AutoCorrelationOutput:
+    name: str
+    value: list[float]
+    p_value: list[float]
+    lags: list[int]
+    hypothesis_test: str|None = None
+    hypothesis_test_description: str|None = None
+    hypothesis_test_notes: str|None = None
+
+@dataclass
+class AutoCorrelationMatrixOutput:
+    name: str
+    value: list[list[float]]
+    p_value: list[list[float]]
+    lags: list[int]
+    hypothesis_test: str|None = None
+    hypothesis_test_description: str|None = None
+    hypothesis_test_notes: str|None = None
+    column_index: list[str]|None = None
+
 def _symmetric(symmetric: bool = True):
     def func(f):
         f._symmetric = symmetric
@@ -209,4 +230,66 @@ def correlation_matrix(A: np.ndarray|pd.DataFrame, B: np.ndarray|pd.DataFrame|No
         column_index = column_index,
         row_index = row_index,
         symmetric = symmetric,
+    )
+
+def auto_correlation_series(a: np.ndarray|pd.Series, lags: int|list[int], metric=pearsonr) -> AutoCorrelationOutput:
+    if isinstance(a, pd.Series):
+        a = a.to_numpy()
+    n = len(a)
+    values = []
+    p_values = []
+    name = None
+    hypothesis_test = None
+    hypothesis_test_description = None
+    hypothesis_test_notes = None
+    if isinstance(lags, int):
+        lags = range(1, lags + 1)
+    lags = sorted(lags)
+    for lag in lags:
+        a_lagged = a[lag:]
+        a_original = a[:n - lag]
+        corr_value = metric(a_original, a_lagged)
+        if isinstance(corr_value, CorrelationOutput):
+            value = corr_value.value
+            p_value = corr_value.p_value
+            name = corr_value.name
+            values.append(value)
+            p_values.append(p_value)
+            hypothesis_test = corr_value.hypothesis_test
+            hypothesis_test_description = corr_value.hypothesis_test_description
+            hypothesis_test_notes = corr_value.hypothesis_test_notes
+    return AutoCorrelationOutput(
+        name = name,
+        value = values,
+        p_value = p_values,
+        lags = lags,
+        hypothesis_test=hypothesis_test,
+        hypothesis_test_description=hypothesis_test_description,
+        hypothesis_test_notes=hypothesis_test_notes
+    )
+
+def auto_correlation_matrix(A: np.ndarray|pd.DataFrame, lags: int|list[int], metric=pearsonr) -> AutoCorrelationMatrixOutput:
+    column_index = getattr(A, 'columns', None)
+    if isinstance(A, pd.DataFrame):
+        A = A.to_numpy()
+    n, m = A.shape
+    results = {}
+    for i in range(m):
+        series = A[:, i]
+        ac_output = auto_correlation_series(series, lags, metric)
+        results[i] = ac_output
+    C = np.zeros((len(results[0].value),m))
+    P = np.zeros((len(results[0].p_value),m))
+    for i in range(m):
+        C[:, i] = results[i].value
+        P[:, i] = results[i].p_value
+    return AutoCorrelationMatrixOutput(
+        name = results[0].name,
+        value = C,
+        p_value = P,
+        lags = results[0].lags,
+        hypothesis_test = results[0].hypothesis_test,
+        hypothesis_test_description = results[0].hypothesis_test_description,
+        hypothesis_test_notes = results[0].hypothesis_test_notes,
+        column_index = column_index,
     )

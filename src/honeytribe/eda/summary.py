@@ -11,7 +11,7 @@ import honeytribe.metrics.correlation
 import honeytribe.metrics.correlation.standard
 import honeytribe.metrics.variability
 import honeytribe.metrics.variability.standard
-from honeytribe.metrics.correlation.standard import CorrelationMatrixOutput
+from honeytribe.metrics.correlation.standard import CorrelationMatrixOutput, AutoCorrelationMatrixOutput
 from honeytribe.metrics.utils import _name_function
 
 class EDASummaryBase:
@@ -201,4 +201,62 @@ class EDAVariabilitySummary(EDASummaryBase, SavedResultsMixin):
             ax.boxplot(column_values, vert=True)
             ax.set_title(f'Boxplot of {column}')
             plots[column] = (fig, ax)
+        return plots
+
+class EDAAutoCorrelationSummary(EDASummaryBase, SavedResultsMixin):
+    def __init__(self, df: pd.DataFrame, lags: int|list[int]|None = None, metrics=None):
+        super().__init__("AutoCorrelation", df)
+        if lags is None:
+            lags = min(20, len(df) - 10)
+        self.lags = lags
+        if metrics is None:
+            metrics = [
+                mt.correlation.standard.pearsonr,
+                mt.correlation.standard.spearmanr,
+                mt.correlation.standard.kendalltau,
+                mt.correlation.standard.chatterjeexi,
+            ]
+        self.metrics = metrics
+    def compute(self) -> dict[str, AutoCorrelationMatrixOutput]:
+        columns = self.df.select_dtypes(include=['number']).columns
+        sub_df = self.df[columns]
+        results = {
+            metric.__name__: mt.correlation.standard.auto_correlation_matrix(sub_df, lags=self.lags, metric=metric) for metric in self.metrics
+        }
+        self.set_results(results)
+        return self.get_results()
+    def get_results(self) -> dict[str, AutoCorrelationMatrixOutput]:
+        if (res := super().get_results()) is None:
+            raise ValueError('Compute results first by calling the `.compute` method.')
+        return res
+    def _serialize_matrix(self, matrix: AutoCorrelationMatrixOutput) -> pd.Series:
+        df = pd.DataFrame(matrix.value, index=matrix.lags, columns=matrix.column_index)
+        labels = []
+        serialized_data = []
+        for i, lag in enumerate(df.index):
+            for j, col_label in enumerate(df.columns):
+                index_label = f"{col_label} lag({lag})"
+                labels.append(index_label)
+                serialized_data.append(df.iloc[i, j])
+        return pd.Series(serialized_data, index=labels)
+    def table(self) -> pd.DataFrame:
+        results = {}
+        for metric_name, result in self.get_results().items():
+            series = self._serialize_matrix(result)
+            results[metric_name] = series
+        return pd.DataFrame(results)
+    def plot(self, fig_kwargs: dict[str, Any]|None = None) -> dict[str, tuple[plt.Figure, plt.Axes]]:
+        if fig_kwargs is None:
+            fig_kwargs = {}
+        plots = {}
+        for metric_name, result in self.get_results().items():
+            for j, col_label in enumerate(result.column_index):
+                fig, ax = plt.subplots(**fig_kwargs)
+                ax.plot(result.lags, result.value[:, j], marker='o', label=col_label)
+                ax.set_title(f'AutoCorrelation: {metric_name} - {col_label}')
+                ax.set_xlabel('Lag')
+                ax.set_ylabel('AutoCorrelation')
+                ax.axhline(0, color='black', linestyle='--', linewidth=0.8)
+                label = f'AutoCorrelation {metric_name} - {col_label}'
+                plots[label] = (fig, ax)
         return plots
