@@ -1,6 +1,11 @@
 import numpy as np
 import pandas as pd
+from math import ceil
 
+from honeytribe.metrics.utils import _name_function
+
+
+@_name_function('mean')
 def mean(a, sample_weight=None):
     val = a.copy()
     if sample_weight is not None:
@@ -9,10 +14,28 @@ def mean(a, sample_weight=None):
         val = val * sample_weight / norm
     return np.mean(val)
 
+@_name_function('median')
 def median(a, sample_weight=None):
     q = 0.5
     return quantile(a, q, sample_weight)
 
+@_name_function('lower_quartile')
+def lower_quartile(a, sample_weight=None):
+    q = 0.25
+    return quantile(a, q, sample_weight)
+
+@_name_function('upper_quartile')
+def upper_quartile(a, sample_weight=None):
+    q = 0.75
+    return quantile(a, q, sample_weight)
+
+@_name_function('min')
+def min(a, sample_weight=None):
+    return np.min(a)
+
+@_name_function('max')
+def max(a, sample_weight=None):
+    return np.max(a)
 
 def quantile(a, q: float, sample_weight = None):
     idx = np.argsort(a)
@@ -32,13 +55,14 @@ def quantile(a, q: float, sample_weight = None):
             q_0 = 0
     else:
         N = len(a)
-        i = N // 2
-        if i % 2 == 1:
+        M = N - 1
+        i = int(ceil(q * M))
+        if i > 0:
+            q_1 = i - (q * M)
+            q_0 = 1 - q_1
+        else:
             q_1 = 1
             q_0 = 0
-        else:
-            q_1 = .5
-            q_0 = .5
     if q_0 > 0:
         val_1 = val[i]
         val_0 = val[i - 1]
@@ -46,6 +70,7 @@ def quantile(a, q: float, sample_weight = None):
     else:
         return val[i]
 
+@_name_function('mode')
 def mode(a, sample_weight=None):
     df = pd.DataFrame(data = {'val':a})
     if sample_weight is not None:
@@ -59,6 +84,7 @@ def mirror_centrality(a, mirror_transform, inverse_transform, centrality_measure
         bias_correction = lambda a: 1.
     return inverse_transform(bias_correction(a) * centrality_measure(mirror_transform(a), **kwargs))
 
+@_name_function('geometric_mean')
 def geometric_mean(a, sample_weight=None):
     return mirror_centrality(
         a,

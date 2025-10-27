@@ -1,5 +1,6 @@
 import numpy as np
 from honeytribe.metrics.centrality import mirror_centrality, mean, quantile
+from honeytribe.metrics.utils import _name_function
 
 def mirror_variability(a, mirror_transform, inverse_transform, centrality_measure, variance_centrality_measure, bias_correction=None, **kwargs):
     midpoint = centrality_measure(a, **kwargs)
@@ -12,6 +13,7 @@ def mirror_variability(a, mirror_transform, inverse_transform, centrality_measur
         **kwargs
     )
 
+@_name_function('std')
 def std(a, sample_weight=None):
     return mirror_variability(
         a,
@@ -43,3 +45,6 @@ def quantile_spread(a, q0, q1 = None, sample_weight=None):
     val_1 = quantile(a, q1, sample_weight=sample_weight)
     return val_1 - val_0
 
+@_name_function('iqr')
+def iqr(a, sample_weight=None):
+    return quantile_spread(a, 0.25, 0.75, sample_weight=sample_weight)
