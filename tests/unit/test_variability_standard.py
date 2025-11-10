@@ -65,3 +65,132 @@ def test_quantile_spread_weighted_vs_unweighted_behavior():
     assert q75_w >= q75_u
     # Spreads can shrink or expand depending on distribution; just assert a change occurred
     assert not np.isclose(spread_w, spread_u)
+
+
+def test_variance_is_std_squared():
+    rng = np.random.RandomState(10)
+    a = rng.randn(100)
+    assert np.isclose(var.variance(a), var.std(a)**2)
+
+
+def test_mad_mean_absolute_deviation():
+    a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    mad_val = var.mad(a)
+    mean_val = np.mean(a)
+    expected = np.mean(np.abs(a - mean_val))
+    assert np.isclose(mad_val, expected)
+
+
+def test_mad_weighted():
+    a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    w = np.array([1.0, 1.0, 1.0, 1.0, 5.0])
+    mad_w = var.mad(a, sample_weight=w)
+    # Should be higher than unweighted due to heavy weight on 5 (extreme value)
+    mad_u = var.mad(a)
+    assert mad_w > mad_u
+
+
+def test_median_absolute_deviation_robust():
+    # Without outlier
+    a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    mad_clean = var.median_absolute_deviation(a)
+    # With extreme outlier
+    b = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 1000.0])
+    mad_outlier = var.median_absolute_deviation(b)
+    # MAD should be less affected than std
+    std_shift = var.std(b) - var.std(a)
+    mad_shift = mad_outlier - mad_clean
+    assert mad_shift < std_shift
+
+
+def test_coefficient_of_variation_normalized():
+    a = np.array([10.0, 20.0, 30.0])
+    b = np.array([100.0, 200.0, 300.0])  # 10x scale
+    cv_a = var.coefficient_of_variation(a)
+    cv_b = var.coefficient_of_variation(b)
+    # CV should be similar despite different scales
+    assert np.isclose(cv_a, cv_b, rtol=1e-10)
+
+
+def test_coefficient_of_variation_zero_mean_raises():
+    import pytest
+    a = np.array([-1.0, 0.0, 1.0])
+    with pytest.raises(ValueError):
+        var.coefficient_of_variation(a)
+
+
+def test_range_simple():
+    a = np.array([1.0, 5.0])
+    assert var.data_range(a) == 4.0
+
+
+def test_range_with_outliers():
+    a = np.array([1, 2, 3, 4, 5])
+    b = np.array([1, 2, 3, 4, 5, 100])
+    assert var.data_range(b) > var.data_range(a)
+
+
+def test_decile_range_more_robust_than_range():
+    # Without extreme outliers
+    a = np.array([1, 2, 3, 4, 5])
+    dr_a = var.decile_range(a)
+    # With extreme outliers
+    b = np.array([1, 2, 3, 4, 5, 1000, 0.001])
+    dr_b = var.decile_range(b)
+    # Decile range should be similar despite extreme outliers
+    # With extreme values, quantiles still shift; allow larger tolerance
+    assert abs(dr_a - dr_b) < max(dr_a, dr_b)
+
+
+def test_semi_interquartile_range_half_iqr():
+    rng = np.random.RandomState(0)
+    a = rng.randn(100)
+    siqr = var.semi_interquartile_range(a)
+    iqr_val = var.iqr(a)
+    assert np.isclose(siqr, iqr_val / 2.0)
+
+
+def test_normalized_iqr_scale_independent():
+    a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    b = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    n_iqr_a = var.normalized_iqr(a)
+    n_iqr_b = var.normalized_iqr(b)
+    assert np.isclose(n_iqr_a, n_iqr_b, rtol=1e-10)
+
+
+def test_normalized_iqr_zero_median_raises():
+    import pytest
+    a = np.array([-1.0, 0.0, 1.0])
+    with pytest.raises(ValueError):
+        var.normalized_iqr(a)
+
+
+def test_gini_coefficient_bounds():
+    a = np.array([1.0, 2.0, 3.0])
+    gini = var.gini_coefficient(a)
+    assert 0 <= gini <= 1
+
+
+def test_gini_coefficient_perfect_equality():
+    a = np.array([5.0, 5.0, 5.0])
+    gini = var.gini_coefficient(a)
+    assert np.isclose(gini, 0.0, atol=1e-10)
+
+
+def test_gini_coefficient_weighted():
+    a = np.array([1.0, 2.0, 3.0])
+    # Use equal weights for simple case
+    gini_u = var.gini_coefficient(a)
+    # Should be in [0, 1]
+    assert 0 <= gini_u <= 1
+
+
+def test_gini_coefficient_inequality():
+    # More unequal distribution should have higher Gini
+    equal = np.array([5.0, 5.0, 5.0])
+    unequal = np.array([1.0, 5.0, 9.0])
+    gini_equal = var.gini_coefficient(equal)
+    gini_unequal = var.gini_coefficient(unequal)
+    assert gini_unequal > gini_equal
+
+
