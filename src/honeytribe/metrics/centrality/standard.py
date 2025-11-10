@@ -40,35 +40,40 @@ def max(a, sample_weight=None):
 def quantile(a, q: float, sample_weight = None):
     idx = np.argsort(a)
     val = a[idx]
+    q = float(q)
+    q = 0.0 if q < 0 else (1.0 if q > 1 else q)
+    N = len(a)
+    if N == 0:
+        raise ValueError('quantile of empty array')
     if sample_weight is not None:
-        p = sample_weight[idx] / np.sum(sample_weight)
-        i = np.searchsorted(p, q)
-        if i > 0:
-            p_1 = p[i]
-            p_0 = p[i - 1]
-            d_1 = p_1 - q
-            d_0 = q - p_0
-            q_1 = d_1 / (d_1 + d_0)
-            q_0 = 1 - q_1
+        w = np.asarray(sample_weight)[idx]
+        if np.any(w < 0):
+            raise ValueError('sample_weight must be non-negative')
+        if np.all(w == 0):
+            # fall back to unweighted
+            raise ValueError('sample_weight cannot be all zero')
         else:
-            q_1 = 1
-            q_0 = 0
-    else:
-        N = len(a)
-        M = N - 1
-        i = int(ceil(q * M))
-        if i > 0:
-            q_1 = i - (q * M)
-            q_0 = 1 - q_1
-        else:
-            q_1 = 1
-            q_0 = 0
-    if q_0 > 0:
-        val_1 = val[i]
-        val_0 = val[i - 1]
-        return q_1 * val_1 + q_0 * val_0
-    else:
-        return val[i]
+            c = np.cumsum(w) / np.sum(w)
+            i = np.searchsorted(c, q, side='left')
+            if i == 0:
+                return val[0]
+            if i >= N:
+                return val[-1]
+            c0 = c[i-1]
+            c1 = c[i]
+            if c1 == c0:
+                return val[i]
+            t = (q - c0) / (c1 - c0)
+            return (1 - t) * val[i-1] + t * val[i]
+    if N == 1:
+        return val[0]
+    k = q * (N - 1)
+    i0 = int(np.floor(k))
+    i1 = int(np.ceil(k))
+    if i0 == i1:
+        return val[i0]
+    t = k - i0
+    return (1 - t) * val[i0] + t * val[i1]
 
 @_name_function('mode')
 def mode(a, sample_weight=None):
