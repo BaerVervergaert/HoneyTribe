@@ -102,8 +102,15 @@ def chatterjeexi(a, b):
     1. It always lies between 0 and 1.
     2. It is 0 if and only if the variables are independent.
     3. It is 1 if and only if there is a measurable function f such that Y = f(X) almost surely.
+
+    Note: Without ties, the maximum value of xi is (n-2)/(n+1).
+        This can be adjusted by multiplying xi by (n+1)/(n-2) to obtain a corrected xi that reaches 1 for functional relationships.
+        However, this correction is not yet implemented here.
+
+    Note: It is possible that xi < 0. For large datasets, this is an indication that the sample is not drawn from an iid generator.
     """
     xi, p_value = st.chatterjeexi(a, b)
+    xi = float(xi)
     return CorrelationOutput(
         name = "Chatterjee-xi",
         value = xi,
@@ -114,7 +121,10 @@ def chatterjeexi(a, b):
 
 @_name_function('somersd')
 def somersd(contingency_table):
-    d, p_value = st.somersd(contingency_table)
+    result = st.somersd(contingency_table)
+    # SciPy returns SomersDResult object with statistic and pvalue
+    d = getattr(result, 'statistic', None)
+    p_value = getattr(result, 'pvalue', None)
     return CorrelationOutput(
         name = "Somers-d",
         value = d,
@@ -162,7 +172,11 @@ def relative_model_improvement_coefficient(a, b, baseline):
     b_err = b - baseline
     a_norm = np.sqrt(np.mean(a_err**2))
     b_norm = np.sqrt(np.mean(b_err**2))
-    return np.mean(a_err * b_err) / (a_norm * b_norm)
+    denom = a_norm * b_norm
+    if denom == 0:
+        # If either candidate or target has zero variance relative to baseline, defined improvement is 0
+        return 0.0
+    return np.mean(a_err * b_err) / denom
 
 def error_correlation_for_model_improvement(a, b, baseline, metric=pearsonr):
     """Correlation of errors for model improvement.

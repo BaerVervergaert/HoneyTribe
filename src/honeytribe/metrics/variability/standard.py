@@ -15,6 +15,8 @@ def mirror_variability(a, mirror_transform, inverse_transform, centrality_measur
 
 @_name_function('std')
 def std(a, sample_weight=None):
+    if len(a) < 2:
+        raise ValueError('std requires at least two observations (n>=2) for unbiased estimation.')
     return mirror_variability(
         a,
         mirror_transform=lambda x: x**2,
