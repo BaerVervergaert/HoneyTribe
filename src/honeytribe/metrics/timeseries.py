@@ -90,20 +90,17 @@ def exponentially_weighted_mean(data:TimeSeriesData, p:float=1.) -> TimeSeriesDa
 
 @_name_function('exponentially_weighted_std')
 def exponentially_weighted_std(data:TimeSeriesData, p:float=1.) -> TimeSeriesData:
-    """Compute exponentially weighted standard deviation.
-
-    Parameters:
-        data (TimeSeriesData): The time series data.
-        p (float): The decay factor (0 < p <= 1). A value of
-                        1 means no decay, while values closer to 0 give more weight to recent observations
-    Returns:
-        TimeSeriesData: The exponentially weighted standard deviation.
-    """
+    """Compute exponentially weighted standard deviation using covariance diagonal for consistent scaling."""
     mean = exponentially_weighted_mean(data, p)
-    second_moment = exponentially_weighted_moment_estimator(data, p, power=2., abs = True)
-    var = second_moment.df - mean.df**2
-    std = np.sqrt(var)
-    return TimeSeriesData(std)
+    centered = TimeSeriesData(
+        data.df - mean.df
+    )
+    def transform(row):
+        d = {}
+        for col, value in row.items():
+            d[col] = value ** 2
+        return pd.Series(d)
+    return exponentially_weighted_transform_estimator(centered, transform, p).apply_rowwise(np.sqrt)
 
 @_name_function('exponentially_weighted_covariance')
 def exponentially_weighted_covariance(data:TimeSeriesData, p:float=1.) -> TimeSeriesData:
@@ -133,19 +130,18 @@ def exponentially_weighted_covariance(data:TimeSeriesData, p:float=1.) -> TimeSe
 def exponentially_weighted_correlation(data:TimeSeriesData, p:float=1.):
     """Compute exponentially weighted correlation.
 
-    Parameters:
-        data (TimeSeriesData): The time series data.
-        p (float): The decay factor (0 < p <= 1). A value of
-                        1 means no decay, while values closer to 0 give more weight to recent observations
-    Returns:
-        TimeSeriesData: The exponentially weighted correlation.
+    Uses covariance and standard deviations derived from the covariance diagonal for consistent normalization.
+    Adds a small epsilon to denominators to avoid division by zero in near-constant segments.
     """
+    cov = exponentially_weighted_covariance(data, p)
     std = exponentially_weighted_std(data, p)
-    corr = exponentially_weighted_covariance(data, p)
-    df = corr.df.copy()
-    for col1 in std.columns:
-        for col2 in std.columns:
-            df[f'{col1}_{col2}'] = df[f'{col1}_{col2}'] / (std.df[col1]*std.df[col2])
+    eps = 1e-12
+    df = cov.df.copy()
+    for col1 in data.columns:
+        for col2 in data.columns:
+            label = f'{col1}_{col2}'
+            denom = (std.df[col1] * std.df[col2]).replace(0, eps)
+            df[label] = df[label] / denom
     return TimeSeriesData(df)
 
 def rolling_unary_metric(data: TimeSeriesData, func: Callable, *args, **kwargs) -> pd.DataFrame:
@@ -227,4 +223,3 @@ def rolling_autocorrelation_metric(data: TimeSeriesData, correlation_metric: Cal
                     combined_df = pd.concat([lagged_series, target_series], axis=1)
                     out[label] = target_series.rolling(*args, **kwargs).apply(transform, args=(combined_df, lag_col, col2))
     return pd.DataFrame(out)
-

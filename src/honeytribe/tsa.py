@@ -1,6 +1,7 @@
-from typing import Literal, Generator
+from typing import Literal, Self
 
 import pandas as pd
+
 
 class TimeSeriesData:
     def __init__(self, df: pd.DataFrame, time_column: str|None = None):
@@ -91,3 +92,8 @@ class TimeSeriesData:
 
     def __getattr__(self, item):
         return getattr(self.df, item)
+
+    def apply_rowwise(self, func) -> Self:
+        """Apply a function row-wise to the DataFrame and return a new TimeSeriesData."""
+        new_df = self.df.apply(func, axis=1)
+        return TimeSeriesData(new_df)

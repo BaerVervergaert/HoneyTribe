@@ -1,7 +1,6 @@
 from typing import Literal
 
 import matplotlib.pyplot as plt
-import weasyprint
 from pathlib import Path
 import io
 import base64
@@ -115,6 +114,13 @@ class ReportRenderer:
     def set_title(self, title: str) -> None:
         self.title = title
     def render_pdf(self, output_path: str|Path) -> None:
+        # Import weasyprint lazily so it remains an optional dependency
+        try:
+            import weasyprint  # type: ignore
+        except Exception as exc:
+            raise ImportError(
+                "weasyprint is required to render PDFs. Install the 'visual' extra: pip install .[visual]"
+            ) from exc
         output_path = Path(output_path)
         html_content = self.render_html()
         weasyprint.HTML(string=html_content).write_pdf(output_path)
