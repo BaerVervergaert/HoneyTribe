@@ -151,3 +151,121 @@ def test_mode_weighted_affects_result_on_tie():
     w_two_heavy = np.array([1.0, 2.0])
     assert cen.mode(a, sample_weight=w_two_heavy) == 2
 
+
+def test_trimmed_mean_removes_extremes():
+    a = np.array([1, 2, 3, 4, 5, 100])
+    trimmed = cen.trimmed_mean(a, trim=0.167)  # Remove 1 from each end (1/6)
+    # Trimmed to [2, 3, 4, 5]
+    assert np.isclose(trimmed, 3.5)
+
+
+def test_trimmed_mean_weighted():
+    a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    w = np.array([1.0, 1.0, 1.0, 1.0, 10.0])  # 5 heavily weighted
+    trimmed_w = cen.trimmed_mean(a, trim=0.2, sample_weight=w)
+    # After trimming 1 from each end: [2, 3, 4] with weights [1, 1, 1]
+    assert np.isclose(trimmed_w, 3.0)
+
+
+def test_trimmed_mean_invalid_trim():
+    import pytest
+    a = np.array([1, 2, 3])
+    with pytest.raises(ValueError):
+        cen.trimmed_mean(a, trim=0.6)
+
+
+def test_winsorized_mean_caps_extremes():
+    a = np.array([1, 2, 3, 4, 5, 100])
+    winsorized = cen.winsorized_mean(a, limits=0.167)
+    # Cap at 16.7% and 83.3% quantiles
+    q10 = cen.quantile(a, 0.167)
+    q90 = cen.quantile(a, 0.833)
+    capped = np.clip(a, q10, q90)
+    assert np.isclose(winsorized, np.mean(capped))
+
+
+def test_winsorized_mean_weighted():
+    a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    w = np.array([1.0, 1.0, 1.0, 1.0, 6.0])
+    winsorized = cen.winsorized_mean(a, limits=0.2, sample_weight=w)
+    # With heavy weight on 5, winsorized mean is pulled toward upper quantiles
+    assert np.isclose(winsorized, 3.9)
+
+
+def test_midhinge_equals_quartile_average():
+    rng = np.random.RandomState(0)
+    a = rng.randn(100)
+    mh = cen.midhinge(a)
+    q1 = cen.lower_quartile(a)
+    q3 = cen.upper_quartile(a)
+    assert np.isclose(mh, (q1 + q3) / 2.0)
+
+
+def test_power_mean_special_cases():
+    a = np.array([1.0, 2.0, 4.0, 8.0])
+    # p=1 is arithmetic mean
+    assert np.isclose(cen.power_mean(a, p=1.0), cen.mean(a))
+    # p=0 is geometric mean
+    assert np.isclose(cen.power_mean(a, p=0.0), cen.geometric_mean(a))
+    # p=2 is quadratic mean (RMS)
+    rms_expected = np.sqrt(np.mean(a**2))
+    assert np.isclose(cen.power_mean(a, p=2.0), rms_expected)
+    # Harmonic mean: n / sum(1/x)
+    harmonic_expected = len(a) / np.sum(1.0 / a)
+    assert np.isclose(cen.power_mean(a, p=-1.0), harmonic_expected)
+
+
+def test_power_mean_weighted():
+    a = np.array([1.0, 2.0, 4.0])
+    w = np.array([1.0, 1.0, 2.0])
+    # Weighted power mean with p=2
+    power2_weighted = cen.power_mean(a, p=2.0, sample_weight=w)
+    # Should be higher than unweighted due to weight on 4.0
+    power2_unweighted = cen.power_mean(a, p=2.0)
+    assert power2_weighted > power2_unweighted
+
+
+def test_power_mean_negative_p_positive_data():
+    a = np.array([1.0, 2.0, 4.0])
+    pm = cen.power_mean(a, p=-1.0)
+    assert pm > 0
+
+
+def test_power_mean_negative_p_with_nonpositive_raises():
+    import pytest
+    a = np.array([0.0, 1.0, 2.0])
+    with pytest.raises(ValueError):
+        cen.power_mean(a, p=-1.0)
+
+
+def test_hodges_lehmann_robust_to_outlier():
+    # Without outlier
+    a = np.array([1.0, 2.0, 3.0])
+    hl = cen.hodges_lehmann(a)
+    # With outlier
+    b = np.array([1.0, 2.0, 3.0, 1000.0])
+    hl_outlier = cen.hodges_lehmann(b)
+    # HL should not shift as dramatically as mean
+    mean_shift = np.mean(b) - np.mean(a)
+    hl_shift = hl_outlier - hl
+    assert hl_shift < mean_shift
+
+
+def test_hodges_lehmann_symmetric_data():
+    # For symmetric data, HL should equal median
+    a = np.array([1, 2, 3, 4, 5])
+    hl = cen.hodges_lehmann(a)
+    med = cen.median(a)
+    assert np.isclose(hl, med, atol=1e-10)
+
+
+def test_midrange_simple():
+    a = np.array([1.0, 5.0])
+    assert cen.midrange(a) == 3.0
+
+
+def test_midrange_asymmetric():
+    a = np.array([1, 2, 3, 100])
+    mr = cen.midrange(a)
+    assert mr == (1 + 100) / 2.0
+
