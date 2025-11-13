@@ -26,7 +26,7 @@ class TimeSeriesData:
             elif pd.api.types.is_numeric_dtype(self.df.index):
                 return 'numeric'
             else:
-                print(f'Unknown dtype, got: {self.df.dtype}')
+                print(f'Unknown dtype, got: {self.df.index.dtype}')
                 return 'unknown'
         except AttributeError:
             raise ValueError(f'Unable to determine index dimension for index of type {type(self.df.index)}')
@@ -37,12 +37,17 @@ class TimeSeriesData:
         # Handle RangeIndex
         # Otherwise, mark as unknown and assumed regular
         if self._index_dimension == 'time':
-            inferred_freq = pd.infer_freq(self.df.index)
-            if inferred_freq is None:
-                print("Warning: Time index has irregular intervals.")
-                self.freq = 'irregular time'
+            # IntervalIndex and TimedeltaIndex cannot be processed by infer_freq
+            if isinstance(self.df.index, (pd.IntervalIndex, pd.TimedeltaIndex)):
+                print(f"Warning: Index of type {type(self.df.index).__name__} does not support automatic frequency inference.")
+                self.freq = 'unknown'
             else:
-                self.freq = inferred_freq
+                inferred_freq = pd.infer_freq(self.df.index)
+                if inferred_freq is None:
+                    print("Warning: Time index has irregular intervals.")
+                    self.freq = 'irregular time'
+                else:
+                    self.freq = inferred_freq
         elif self._index_dimension == 'numeric':
             if isinstance(self.df.index, pd.RangeIndex):
                 self.freq = abs(self.df.index.step)
@@ -99,6 +104,10 @@ class TimeSeriesData:
         if item.startswith('_'):
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
         return getattr(self.df, item)
+
+    def __len__(self):
+        """Return the length of the DataFrame."""
+        return len(self.df)
 
     def apply_rowwise(self, func) -> Self:
         """Apply a function row-wise to the DataFrame and return a new TimeSeriesData."""
