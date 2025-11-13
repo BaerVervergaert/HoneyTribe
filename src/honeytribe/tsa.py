@@ -2,19 +2,10 @@ from typing import Literal, Self
 
 import pandas as pd
 
-class A:
-    def __init__(self):
-        self.x = 2
-        if self._test:
-            print('Yeash!')
-    @property
-    def _test(self):
-        return self.x == 2
-    def __getattr__(self, item):
-        return getattr(self.x, item)
-
 class TimeSeriesData:
     def __init__(self, df: pd.DataFrame, time_column: str|None = None):
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError(f'Input data must be a pandas DataFrame, got {type(df)}')
         df = df.copy()
         if time_column is not None:
             df = df.set_index(time_column)
@@ -27,15 +18,18 @@ class TimeSeriesData:
 
     @property
     def _index_dimension(self) -> Literal['time', 'numeric', 'unknown']:
-        if isinstance(self.df.index, (pd.DatetimeIndex, pd.PeriodIndex, pd.IntervalIndex)):
-            return 'time'
-        elif pd.api.types.is_timedelta64_dtype(self.df.index) or pd.api.types.is_timedelta64_ns_dtype(self.df.index):
-            return 'time'
-        elif pd.api.types.is_numeric_dtype(self.df.index):
-            return 'numeric'
-        else:
-            print(f'Unknown dtype, got: {self.df.dtype}')
-            return 'unknown'
+        try:
+            if isinstance(self.df.index, (pd.DatetimeIndex, pd.PeriodIndex, pd.IntervalIndex)):
+                return 'time'
+            elif pd.api.types.is_timedelta64_dtype(self.df.index) or pd.api.types.is_timedelta64_ns_dtype(self.df.index):
+                return 'time'
+            elif pd.api.types.is_numeric_dtype(self.df.index):
+                return 'numeric'
+            else:
+                print(f'Unknown dtype, got: {self.df.dtype}')
+                return 'unknown'
+        except AttributeError:
+            raise ValueError(f'Unable to determine index dimension for index of type {type(self.df.index)}')
 
     def _init_frequency(self):
         # Guess frequency, if possible
