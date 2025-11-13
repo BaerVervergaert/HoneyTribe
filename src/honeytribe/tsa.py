@@ -2,6 +2,16 @@ from typing import Literal, Self
 
 import pandas as pd
 
+class A:
+    def __init__(self):
+        self.x = 2
+        if self._test:
+            print('Yeash!')
+    @property
+    def _test(self):
+        return self.x == 2
+    def __getattr__(self, item):
+        return getattr(self.x, item)
 
 class TimeSeriesData:
     def __init__(self, df: pd.DataFrame, time_column: str|None = None):
@@ -91,6 +101,9 @@ class TimeSeriesData:
         return self.df.index.max()
 
     def __getattr__(self, item):
+        # Don't delegate private attributes or magic methods
+        if item.startswith('_'):
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
         return getattr(self.df, item)
 
     def apply_rowwise(self, func) -> Self:
