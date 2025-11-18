@@ -16,7 +16,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, Callable
 import pandas as pd
 import numpy as np
 
-from .online_convex_optimization.base import OnlineGame, DatasetGame, OnlineAlgorithm
+from .online_convex_optimization.base import OnlineGame, OnlineAlgorithm
 
 
 @dataclass
