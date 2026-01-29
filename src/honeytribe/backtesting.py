@@ -11,7 +11,7 @@ This implementation aims to be minimal and safe as a first pass; it's easy to ex
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, Callable
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, Callable, Literal
 
 import pandas as pd
 import numpy as np
@@ -64,6 +64,7 @@ class BacktestGame(OnlineGame):
         target_col: Optional[str] = None,
         window_unit: str = "observations",
         horizon: Union[str, pd.Timedelta] = "1D",
+        line_up_cadence_with: Literal["front", "back"] = "front",
     ) -> None:
         # Validate and normalize data
         if not isinstance(data, pd.DataFrame):
@@ -87,6 +88,7 @@ class BacktestGame(OnlineGame):
         self.target_col = target_col
         self.window_unit = window_unit
         self.horizon = horizon
+        self.line_up_cadence_with = line_up_cadence_with
 
         # Internal pointer - will be set on reset()
         self._step_dates: List[pd.Timestamp] = []
@@ -104,54 +106,77 @@ class BacktestGame(OnlineGame):
         Behavior:
         - If cadence is int: treat as index-offset (advance pointer by that many observations)
         - If cadence is string or Timedelta: treat as calendar offset and choose the nearest index >= current + offset
+        - If line_up_cadence_with is 'front', align the first step date with the start of the data
+        - If line_up_cadence_with is 'back', align the last step date with the end of the data
         """
+        # Handle empty data case
         idx = self.data.index
         if len(idx) == 0:
             self._step_dates = []
             return
 
-        # Start with first available index where a full window is possible
-        # For observation-based windows we need at least window_length observations
-        if self.window_unit == "observations":
-            start_pos = self.window_length - 1
+        iter_forward = self.line_up_cadence_with == "front"
+        if self.line_up_cadence_with == "front":
+            start = 0
         else:
-            # calendar-based windows: start at first index
-            start_pos = 0
+            start = len(idx) - 1
 
-        step_dates: List[pd.Timestamp] = []
+        step_dates = []
 
-        # Cadence as integer
-        if isinstance(self.cadence, int):
-            pos = start_pos
-            while pos < len(idx):
-                step_dates.append(idx[pos])
-                pos += max(1, int(self.cadence))
-
-        else:
-            # calendar cadence: convert to Timedelta
-            if isinstance(self.cadence, str):
-                offset = pd.tseries.frequencies.to_offset(self.cadence)
+        current_pos = start
+        current_date = idx[start]
+        prev_ts = None
+        date_min = min(idx)
+        date_max = max(idx)
+        while True:
+            # Check if current_date can form a valid window
+            skip_add = False
+            if self.window_unit == "observations":
+                if current_pos < self.window_length - 1:
+                    skip_add = True
             else:
-                offset = pd.Timedelta(self.cadence)
+                # TODO: Implement calendar-based window check
+                print("Skip window check for calendar-based windows (not implemented)")
+                pass
 
-            # starting at index[start_pos], advance by calendar offsets
-            current_ts = idx[start_pos]
-            while True:
-                # find next index >= current_ts using backfill to avoid backward movement
-                ts = self._find_first_index_at_or_after(current_ts)
-                if ts is None:
+            if not skip_add:
+                step_dates.append(current_date)
+
+            # Advance to next step
+            if isinstance(self.cadence, int):
+                if iter_forward:
+                    current_pos += max(1, int(self.cadence))
+                else:
+                    current_pos -= max(1, int(self.cadence))
+
+                if current_pos < 0 or current_pos >= len(idx):
                     break
-                step_dates.append(ts)
 
-                # advance
-                next_ts = ts + offset
-                # stop if beyond last index
-                if next_ts > idx[-1]:
+                current_date = idx[current_pos]
+            else:
+                if isinstance(self.cadence, str):
+                    offset = pd.tseries.frequencies.to_offset(self.cadence)
+                else:
+                    offset = pd.Timedelta(self.cadence)
+                if iter_forward:
+                    next_date = current_date + offset
+                else:
+                    next_date = current_date - offset
+
+                if next_date < date_min or next_date > date_max:
                     break
-                # set current_ts to next_ts for next loop
-                current_ts = next_ts
 
-        self._step_dates = step_dates
+                ts = self._find_first_index_at_or_after(next_date)
+
+                if ts == prev_ts or ts is None:
+                    raise ValueError("Help! Stuck in an infinite loop computing step dates.")
+
+                current_date = ts
+                current_pos = idx.get_loc(current_date)
+
+                prev_ts = ts
+
+        self._step_dates = sorted(step_dates)
 
     def reset(self) -> None:
         """Reset internal pointer."""

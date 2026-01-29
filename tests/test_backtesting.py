@@ -170,6 +170,21 @@ def test_horizon_calendar_basic():
     assert y_true == 6.0, f"Expected 6.0, got {y_true}"
 
 
+def test_horizon_calendar_basic_line_up_with_end():
+    """Test that horizon in calendar mode returns the correct future value."""
+    df = make_daily_df(30)
+    print('df', df)
+
+    # Test with horizon='2D' (2 days ahead)
+    game = BacktestGame(df, window_length=5, cadence='1D', target_col='close', horizon='2D', line_up_cadence_with="back")
+    game.reset()
+    game._step_pos = 0
+
+    # At step 0 (day 4), horizon='2D' should give us day 6
+    y_true = game.get_y_true()
+    assert y_true == 6.0, f"Expected 6.0, got {y_true}"
+
+
 def test_horizon_calendar_multiple_steps():
     """Test that calendar-based horizon works consistently across multiple steps."""
     df = make_daily_df(30)
