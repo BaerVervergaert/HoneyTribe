@@ -137,7 +137,7 @@ class InverseWeightedKMeans(BaseEstimator, ClusterMixin, TransformerMixin):
     Notes:
         (Algorithm description and references)
     We also considered the performance function
-    J2 = \sum^N_{i=1} [ \sum^K_{j=1} 1/||x_i - m_j||^{-p} ] \min^K_{k=1} ||x_i - m_k||^n (8)
+    J2 = \sum^N_{i=1} [ \sum^K_{j=1} 1/||x_i - m_j||^p ] \min^K_{k=1} ||x_i - m_k||^n (8)
     Using the same method as above, this gives the batch
     algorithm
     m_r(t + 1) = [ \sum_{i \in V_r} x_i a_{ir} + \sum_{i \in V_j, j \neq r} x_i b_{ir} ] / [ \sum_{i \in V_r} a_{ir} + \sum_{i \in V_j, j \neq r} b_{ir} ] (9)
@@ -331,7 +331,6 @@ class InverseWeightedOnlineKMeansV1(BaseEstimator, ClusterMixin, TransformerMixi
     def partial_fit(self, X, y=None):
         if self.cluster_centers_ is None:
             self.initialize_centers(X)
-            self.v_ = np.ones(self.n_clusters)
 
         n_samples, n_features = X.shape
         for i in range(n_samples):
@@ -360,6 +359,7 @@ class InverseWeightedOnlineKMeansV1(BaseEstimator, ClusterMixin, TransformerMixi
         n_samples, n_features = X.shape
         random_indices = np.random.choice(n_samples, self.n_clusters, replace=False)
         self.cluster_centers_ = X[random_indices]
+        self.v_ = np.ones(self.n_clusters)
     def fit(self, X, y=None):
         if self.cluster_centers_ is None:
             self.initialize_centers(X)
